@@ -2,7 +2,7 @@
  * Ingest one photo as a grayscale plate.
  *
  *     npm run plate -- ./photo.jpg --caption "Two-point boxes"
- *     npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction --title "Boxes"
+ *     npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -18,6 +18,7 @@ const MAX_EDGE = 1800;
 const QUALITY = 82;
 
 const CATEGORIES = {
+  feed: "feed",
   "form-construction": "form-construction",
   practice: "form-construction",
   "drafting-meta": "drafting-meta",
@@ -61,13 +62,13 @@ function uniqueSlug(dir, base) {
 const fileArg = process.argv.slice(2).find((value) => !value.startsWith("--"));
 const caption = arg("caption");
 const title = arg("title") || caption;
-const sectionArg = arg("section") || "form-construction";
+const sectionArg = arg("section") || "feed";
 const category = CATEGORIES[sectionArg];
 const date = arg("date") || new Date().toISOString().slice(0, 10);
 
 if (!fileArg || !caption || !category) {
   console.error(
-    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--section form-construction] [--title "Boxes"] [--date 2026-08-28]'
+    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--section feed] [--title "Boxes"] [--date 2026-08-28]'
   );
   process.exit(1);
 }
@@ -105,15 +106,15 @@ const info = await image
 const wide = info.width / info.height >= 1.3;
 const imagePath = `/art/${slug}.webp`;
 const extras =
-  category === "form-construction"
-    ? `caption: "${yaml(caption)}"
+  category === "drafting-meta"
+    ? `excerpt: "${yaml(caption)}"
+image: "${imagePath}"
+`
+    : `caption: "${yaml(caption)}"
 excerpt: "${yaml(caption)}"
 image: "${imagePath}"
 aspectRatio: "${info.width} / ${info.height}"
 wide: ${wide}
-`
-    : `excerpt: "${yaml(caption)}"
-image: "${imagePath}"
 `;
 
 await writeFile(
@@ -127,5 +128,7 @@ ${extras}---
   "utf8"
 );
 
+const href =
+  category === "feed" ? `/feed/${slug}` : `/${category}/${slug}`;
 console.log(path.relative(ROOT, path.join(contentDir, `${slug}.md`)));
-console.log(`http://localhost:3000/${category}/${slug}`);
+console.log(`http://localhost:3000${href}`);

@@ -10,7 +10,7 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-const category = "form-construction" as const;
+const category = "feed" as const;
 
 export function generateStaticParams() {
   return getExercisesByCategory(category).map((exercise) => ({
@@ -27,11 +27,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: exercise.excerpt,
     };
   } catch {
-    return { title: "Exercise" };
+    return { title: "Plate" };
   }
 }
 
-export default async function FormConstructionExercisePage({ params }: Props) {
+export default async function FeedPlatePage({ params }: Props) {
   const { slug } = await params;
   const slugs = getExercisesByCategory(category).map((item) => item.slug);
   if (!slugs.includes(slug)) notFound();

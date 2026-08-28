@@ -10,7 +10,7 @@ export function Gallery({ exercises, label }: Props) {
   if (exercises.length === 0) {
     return (
       <p className="page-lede" style={{ padding: "0 var(--page-pad)" }}>
-        No plates yet.
+        Nothing here yet.
       </p>
     );
   }

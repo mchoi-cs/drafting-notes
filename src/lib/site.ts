@@ -1,4 +1,10 @@
 export const CATEGORIES = {
+  feed: {
+    slug: "feed",
+    label: "Feed",
+    href: "/",
+    lede: "Whatever just got uploaded — casual plates, newest first.",
+  },
   "form-construction": {
     slug: "form-construction",
     label: "Form Construction",

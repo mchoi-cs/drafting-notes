@@ -1,11 +1,7 @@
 import { Gallery } from "@/components/Gallery";
-import { getAllExercises } from "@/lib/exercises";
+import { getExercisesByCategory } from "@/lib/exercises";
 
 export default function HomePage() {
-  const plates = getAllExercises().filter(
-    (exercise) =>
-      exercise.image || exercise.category === "form-construction"
-  );
-
+  const plates = getExercisesByCategory("feed");
   return <Gallery exercises={plates} label="Feed" />;
 }

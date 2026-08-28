@@ -74,7 +74,10 @@ function toMeta(
     caption: asString(data.caption) || asString(data.excerpt) || undefined,
     excerpt: asString(data.excerpt) || asString(data.caption),
     category,
-    href: `${CATEGORIES[category].href}/${slug}`,
+    href:
+      category === "feed"
+        ? `/feed/${slug}`
+        : `${CATEGORIES[category].href}/${slug}`,
     image: asString(data.image) || undefined,
     aspectRatio: asString(data.aspectRatio) || undefined,
     wide: Boolean(data.wide),

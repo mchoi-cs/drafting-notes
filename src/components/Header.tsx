@@ -8,7 +8,7 @@ export function Header() {
   const pathname = usePathname();
 
   function isActive(href: string) {
-    if (href === "/") return pathname === "/";
+    if (href === "/") return pathname === "/" || pathname.startsWith("/feed");
     return pathname.startsWith(href);
   }
 
