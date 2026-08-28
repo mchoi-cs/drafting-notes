@@ -1,0 +1,6 @@
+# Originals are only used locally by `npm run art`, which writes web-sized
+# copies into public/. The build never opens these files.
+assets
+
+node_modules
+.next
