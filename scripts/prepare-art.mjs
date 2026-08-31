@@ -5,21 +5,18 @@
  * you pass --force.
  */
 import { execFile } from "node:child_process";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import path from "node:path";
 import os from "node:os";
-import sharp from "sharp";
+import { processPlate } from "./lib/process-plate.mjs";
 
 const run = promisify(execFile);
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const SOURCE = path.join(ROOT, "assets");
 const OUT = path.join(ROOT, "public", "art");
-
-const MAX_EDGE = 1800;
-const QUALITY = 82;
 
 const force = process.argv.includes("--force");
 
@@ -52,24 +49,14 @@ for (const name of files) {
     continue;
   }
 
-  const image = sharp(await readable(from)).rotate().greyscale();
-  const { width, height } = await image.metadata();
-  const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
-
-  const info = await image
-    .resize({
-      width: Math.round(width * scale),
-      height: Math.round(height * scale),
-      fit: "inside",
-    })
-    .webp({ quality: QUALITY })
-    .toFile(to);
+  const info = await processPlate(await readable(from));
+  await writeFile(to, info.buffer);
 
   const before = (await stat(from)).size;
-  const ratio = (before / info.size).toFixed(0);
+  const ratio = (before / info.buffer.length).toFixed(0);
   console.log(
     `write ${path.relative(ROOT, to)}  ${info.width}x${info.height}  ` +
-      `${(info.size / 1024).toFixed(0)}KB  (${ratio}x smaller)  ` +
+      `${(info.buffer.length / 1024).toFixed(0)}KB  (${ratio}x smaller)  ` +
       `aspect ${info.width} / ${info.height}`
   );
 }

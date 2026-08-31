@@ -10,12 +10,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
-import sharp from "sharp";
+import { processPlate } from "./lib/process-plate.mjs";
 
 const run = promisify(execFile);
 const ROOT = path.resolve(import.meta.dirname, "..");
-const MAX_EDGE = 1800;
-const QUALITY = 82;
 
 const CATEGORIES = {
   feed: "feed",
@@ -79,11 +77,6 @@ if (!existsSync(from)) {
   process.exit(1);
 }
 
-const image = sharp(await readable(from)).rotate().greyscale();
-const { width, height } = await image.metadata();
-const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
-const nextWidth = Math.round(width * scale);
-const nextHeight = Math.round(height * scale);
 const slug = uniqueSlug(
   path.join(ROOT, "content", category),
   slugify(title)
@@ -94,14 +87,8 @@ const contentDir = path.join(ROOT, "content", category);
 await mkdir(artDir, { recursive: true });
 await mkdir(contentDir, { recursive: true });
 
-const info = await image
-  .resize({
-    width: nextWidth,
-    height: nextHeight,
-    fit: "inside",
-  })
-  .webp({ quality: QUALITY })
-  .toFile(path.join(artDir, `${slug}.webp`));
+const info = await processPlate(await readable(from));
+await writeFile(path.join(artDir, `${slug}.webp`), info.buffer);
 
 const wide = info.width / info.height >= 1.3;
 const imagePath = `/art/${slug}.webp`;
