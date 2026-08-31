@@ -38,14 +38,7 @@ To file it as a construction plate instead:
 npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
 ```
 
-That pipeline:
-
-1. Fixes EXIF orientation and converts to greyscale
-2. Flattens uneven phone lighting (paper vignette / shadows)
-3. Stretches levels so the page reads white and ink stays dark
-4. Writes a WebP to `public/art/` and Markdown in `content/` with the caption and today’s date
-
-No separate AI model is required — local-max paper estimation plus a percentile normalize handles these ink-on-paper shots well and keeps faint pencil.
+That pipeline fixes orientation, flattens uneven phone lighting, stretches the paper toward white, and writes WebP + Markdown. Details, rationale, and the code map are in **[docs/plate-pipeline.md](docs/plate-pipeline.md)**.
 
 ```bash
 npm run post -- "Why boxes first" drafting-meta
