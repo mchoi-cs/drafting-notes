@@ -71,7 +71,7 @@ Instead the pipeline estimates the *paper* as a slowly varying field:
 
 ### 3. Stretch levels
 
-A percentile normalize maps darkest ink → near black and paper → near white. Ink plates use a **manual** levels stretch (sharp’s built-in `normalize` on 1-channel buffers introduces banding) plus a soft lift on the brightest paper so remaining grey doesn’t read as cream against the site.
+Ink plates use a **soft paper-white grade** (scale the bright paper percentile toward ~242) instead of a hard black-point stretch. That keeps washes in the greys, closer to early feed plates like bird-woman-study. Color plates still use a fuller levels stretch so hue stays punchy.
 
 ### 4. Encode + write content
 

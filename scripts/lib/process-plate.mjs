@@ -11,16 +11,13 @@ import sharp from "sharp";
 export const MAX_EDGE = 1800;
 export const QUALITY = 82;
 
-/** Default levels — paper → white, ink → black. */
-const NORMALIZE_LOWER = 0.5;
-const NORMALIZE_UPPER = 99;
-/**
- * Brighter ink plates: clip paper harder toward white so grey paper
- * doesn't read as warm/cream against the site background.
- */
-const BRIGHT_NORMALIZE_UPPER = 92;
-const PAPER_REF = 245;
-const BRIGHT_PAPER_REF = 252;
+/** Soft ink grade — match early feed plates (bird-woman, face study). */
+const PAPER_REF = 242;
+/** Color plates can stretch a bit harder; ink washes should stay grey. */
+const COLOR_NORMALIZE_LOWER = 0.5;
+const COLOR_NORMALIZE_UPPER = 99;
+const INK_PAPER_PERCENTILE = 96;
+const INK_PAPER_TARGET = 242;
 
 /**
  * @typedef {{ color?: boolean, brighter?: boolean }} ProcessOptions
@@ -194,22 +191,26 @@ function flattenIllumination(raw, width, height, channels, paperRef) {
 }
 
 /**
- * Soft lift on the brightest paper only — avoids cream cast next to the
- * white site field without washing midtone washes.
+ * Soft ink grade: only pull paper toward a clean white point.
+ * Do not crush the black point — that is what made newer plates too contrasty
+ * compared with early feed work like bird-woman-study.
  */
-function liftInkPaper(mono) {
+function softInkPaperWhite(mono) {
+  const hist = new Float64Array(256);
+  for (let i = 0; i < mono.length; i++) hist[mono[i]]++;
+  const paper = Math.max(
+    8,
+    channelPercentile(hist, mono.length, INK_PAPER_PERCENTILE)
+  );
+  const scale = INK_PAPER_TARGET / paper;
+  if (Math.abs(scale - 1) < 0.02) return mono;
+
   const out = Buffer.allocUnsafe(mono.length);
   for (let i = 0; i < mono.length; i++) {
-    const v = mono[i];
-    if (v >= 210) {
-      const t = (v - 210) / 45;
-      out[i] = Math.round(238 + t * 17);
-    } else if (v >= 195) {
-      const t = (v - 195) / 15;
-      out[i] = Math.round(v + t * 6);
-    } else {
-      out[i] = v;
-    }
+    let v = Math.round(mono[i] * scale);
+    if (v < 0) v = 0;
+    if (v > 255) v = 255;
+    out[i] = v;
   }
   return out;
 }
@@ -221,9 +222,6 @@ function liftInkPaper(mono) {
  */
 export async function processPlate(inputPath, options = {}) {
   const color = Boolean(options.color);
-  const brighter = options.brighter !== false && !color;
-  const paperRef = brighter ? BRIGHT_PAPER_REF : PAPER_REF;
-  const normalizeUpper = brighter ? BRIGHT_NORMALIZE_UPPER : NORMALIZE_UPPER;
 
   const { data: rgb, info } = await sharp(inputPath)
     .rotate()
@@ -250,11 +248,17 @@ export async function processPlate(inputPath, options = {}) {
     channels = 1;
   }
 
-  let leveled = flattenIllumination(raw, width, height, channels, paperRef);
-  leveled = stretchLevels(leveled, channels, NORMALIZE_LOWER, normalizeUpper);
+  let leveled = flattenIllumination(raw, width, height, channels, PAPER_REF);
 
-  if (brighter && channels === 1) {
-    leveled = liftInkPaper(leveled);
+  if (color) {
+    leveled = stretchLevels(
+      leveled,
+      channels,
+      COLOR_NORMALIZE_LOWER,
+      COLOR_NORMALIZE_UPPER
+    );
+  } else {
+    leveled = softInkPaperWhite(leveled);
   }
 
   let out = sharp(leveled, { raw: { width, height, channels } });
