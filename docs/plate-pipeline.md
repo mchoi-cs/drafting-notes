@@ -34,7 +34,7 @@ Both `npm run plate` and `npm run art` call the same processor: [`scripts/lib/pr
 photo (jpg / png / heic…)
         │
         ▼
-  EXIF rotate → (greyscale unless --color) → resize (max edge 1800)
+  EXIF rotate → white-balance paper → (greyscale unless --color) → resize
         │
         ▼
   Flatten uneven lighting
@@ -42,7 +42,7 @@ photo (jpg / png / heic…)
         │
         ▼
   Percentile normalize (paper → white, ink → black)
-  greyscale uses a slightly brighter clip
+  ink plates get an extra paper lift so grey doesn't read as cream
         │
         ▼
   WebP (q≈82) → public/art/<slug>.webp
@@ -52,9 +52,9 @@ photo (jpg / png / heic…)
                  including color: true|false
 ```
 
-### 1. Orient, optional greyscale, resize
+### 1. Orient, white-balance, optional greyscale, resize
 
-`sharp` applies EXIF orientation, optionally converts to greyscale, and fits the long edge into 1800px.
+`sharp` applies EXIF orientation. Phone photos of cream paper get a quick **white-balance** (scale channels so the bright paper percentile is neutral) before greyscale, so yellow grading does not stick around. Color plates keep hue after the same neutral paper step.
 
 HEIC from iPhones is converted with macOS `sips` first (sharp does not decode HEIC).
 
@@ -67,11 +67,11 @@ Instead the pipeline estimates the *paper* as a slowly varying field:
 1. Split the image into coarse blocks (~1/40 of the short edge).
 2. In each block, take the **local maximum** (brightest channel when color) — ink/wash is darker than paper, so that response tracks illumination.
 3. Upsample that field with **bilinear** interpolation from block centers.
-4. Divide by this field and rescale toward a paper reference (~252 for ink, ~245 for color).
+4. Divide by this field and rescale toward a paper reference (~254 for ink, ~245 for color).
 
 ### 3. Stretch levels
 
-A percentile normalize maps darkest ink → near black and paper → near white. Ink plates use a slightly lower upper percentile so the page reads a bit brighter on the Feed.
+A percentile normalize maps darkest ink → near black and paper → near white. Ink plates then get a soft lift on the bright end so remaining grey paper reads clean against the site’s white field.
 
 ### 4. Encode + write content
 
