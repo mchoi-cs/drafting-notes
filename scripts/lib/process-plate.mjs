@@ -1,9 +1,10 @@
 /**
- * Shared plate processing: greyscale phone photos of ink-on-paper,
+ * Shared plate processing: phone photos of ink-on-paper,
  * flatten uneven lighting, and stretch the paper toward white.
  *
- * Classical illumination correction + histogram stretch — no ML needed
- * for these sketches. Fine pencil stays in the midtones; ink stays dark.
+ * Works on RGB so watercolor / ink washes keep their hue. Illumination
+ * is estimated from a local-max paper field (ink is darker than paper).
+ * Classical correction — no ML needed for these sketches.
  */
 import sharp from "sharp";
 
@@ -15,11 +16,10 @@ const NORMALIZE_LOWER = 0.5;
 const NORMALIZE_UPPER = 99;
 
 /**
- * Estimate paper white with a coarse local-max field (ink is darker than
- * paper, so the bright response tracks illumination). Divide it out so
- * shadowed corners lift with the rest of the page.
+ * Build a coarse local-max illumination field from a 1-channel buffer,
+ * then bilinear-upsample it to full resolution.
  */
-function flattenIllumination(raw, width, height) {
+function paperField(mono, width, height) {
   const short = Math.min(width, height);
   const block = Math.max(12, Math.round(short / 40));
   const cols = Math.ceil(width / block);
@@ -36,7 +36,7 @@ function flattenIllumination(raw, width, height) {
       for (let y = y0; y < y1; y += 2) {
         const row = y * width;
         for (let x = x0; x < x1; x += 2) {
-          const v = raw[row + x];
+          const v = mono[row + x];
           if (v > max) max = v;
         }
       }
@@ -44,8 +44,6 @@ function flattenIllumination(raw, width, height) {
     }
   }
 
-  // Bilinear upsample from block centers — smooth edges without the
-  // long-range bleed that undoes shadowed-corner correction.
   const background = Buffer.allocUnsafe(width * height);
   const maxX = cols - 1;
   const maxY = rows - 1;
@@ -69,15 +67,35 @@ function flattenIllumination(raw, width, height) {
       background[row + x] = Math.round(v0 + (v1 - v0) * ty);
     }
   }
+  return background;
+}
 
-  const out = Buffer.allocUnsafe(raw.length);
+/**
+ * Flatten uneven lighting on an RGB buffer. Paper estimate uses the
+ * per-pixel max channel (brightest response ≈ paper under ink/wash).
+ */
+function flattenIlluminationRgb(rgb, width, height) {
+  const pixels = width * height;
+  const mono = Buffer.allocUnsafe(pixels);
+  for (let i = 0, p = 0; i < pixels; i++, p += 3) {
+    const r = rgb[p];
+    const g = rgb[p + 1];
+    const b = rgb[p + 2];
+    mono[i] = r > g ? (r > b ? r : b) : g > b ? g : b;
+  }
+
+  const background = paperField(mono, width, height);
+  const out = Buffer.allocUnsafe(rgb.length);
   const paperRef = 245;
-  for (let i = 0; i < raw.length; i++) {
-    const b = background[i] < 16 ? 16 : background[i];
-    let v = Math.round((raw[i] / b) * paperRef);
-    if (v < 0) v = 0;
-    if (v > 255) v = 255;
-    out[i] = v;
+  for (let i = 0, p = 0; i < pixels; i++, p += 3) {
+    const bg = background[i] < 16 ? 16 : background[i];
+    const scale = paperRef / bg;
+    for (let c = 0; c < 3; c++) {
+      let v = Math.round(rgb[p + c] * scale);
+      if (v < 0) v = 0;
+      if (v > 255) v = 255;
+      out[p + c] = v;
+    }
   }
   return out;
 }
@@ -91,7 +109,7 @@ export async function processPlate(inputPath) {
   // resize so portrait phone shots don't get swapped width/height.
   const { data, info } = await sharp(inputPath)
     .rotate()
-    .greyscale()
+    .removeAlpha()
     .resize({
       width: MAX_EDGE,
       height: MAX_EDGE,
@@ -101,14 +119,17 @@ export async function processPlate(inputPath) {
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const { width, height } = info;
-  const flattened = flattenIllumination(data, width, height);
+  const { width, height, channels } = info;
+  if (channels !== 3) {
+    throw new Error(`Expected 3-channel RGB after removeAlpha, got ${channels}`);
+  }
+
+  const flattened = flattenIlluminationRgb(data, width, height);
 
   const buffer = await sharp(flattened, {
-    raw: { width, height, channels: 1 },
+    raw: { width, height, channels: 3 },
   })
     .normalize({ lower: NORMALIZE_LOWER, upper: NORMALIZE_UPPER })
-    .toColorspace("b-w")
     .webp({ quality: QUALITY })
     .toBuffer();
 

@@ -45,9 +45,9 @@ photo (jpg / png / heic…)
   (plate only) Markdown → content/<section>/<slug>.md
 ```
 
-### 1. Orient, greyscale, resize
+### 1. Orient and resize
 
-`sharp` applies EXIF orientation, converts to greyscale, and fits the long edge into 1800px. That keeps web assets small while leaving enough resolution for fine pencil.
+`sharp` applies EXIF orientation and fits the long edge into 1800px. Color is kept (ink washes, watercolor) — illumination is corrected on RGB, not forced to greyscale.
 
 HEIC from iPhones is converted with macOS `sips` first (sharp does not decode HEIC).
 
@@ -58,11 +58,11 @@ Phone shots of a page almost always have a vignette or a soft shadow from the ha
 Instead the pipeline estimates the *paper* as a slowly varying field:
 
 1. Split the image into coarse blocks (~1/40 of the short edge).
-2. In each block, take the **local maximum** — ink is darker than paper, so the bright response tracks illumination.
+2. In each block, take the **local maximum** of the brightest channel — ink/wash is darker than paper, so that response tracks illumination.
 3. Upsample that field with **bilinear** interpolation from block centers (smooth block edges without bleeding bright center values into dark corners the way a large Gaussian blur would).
-4. Divide the image by this field and rescale toward a paper reference (~245).
+4. Divide each RGB channel by this field and rescale toward a paper reference (~245).
 
-After this step, a shadowed corner and a bright center both read as similar paper grey.
+After this step, a shadowed corner and a bright center both read as similar paper white, and blue/grey washes keep their hue.
 
 ### 3. Stretch levels
 
@@ -75,7 +75,7 @@ Faint pencil sits in the midtones, so it is not crushed to black or wiped out wi
 
 ### 4. Encode + (for `plate`) write content
 
-Output is greyscale WebP under `public/art/`. `npm run plate` also writes frontmatter Markdown (title, date, caption, image path, aspect ratio) into `content/feed/` or `content/form-construction/`.
+Output is WebP under `public/art/`. `npm run plate` also writes frontmatter Markdown (title, date, caption, image path, aspect ratio) into `content/feed/` or `content/form-construction/`.
 
 Originals can live in `assets/` (gitignored). Only the processed WebP and Markdown are committed.
 

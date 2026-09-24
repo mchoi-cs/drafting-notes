@@ -1,5 +1,5 @@
 /**
- * Ingest one photo as a grayscale plate.
+ * Ingest one photo as a plate (keeps ink/watercolor color, whitens paper).
  *
  *     npm run plate -- ./photo.jpg --caption "Two-point boxes"
  *     npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
