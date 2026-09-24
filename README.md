@@ -38,7 +38,7 @@ To file it as a construction plate instead:
 npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
 ```
 
-That pipeline fixes orientation, flattens uneven phone lighting, stretches the paper toward white, and writes WebP + Markdown. Details, rationale, and the code map are in **[docs/plate-pipeline.md](docs/plate-pipeline.md)**.
+That pipeline fixes orientation, flattens uneven phone lighting, stretches the paper toward white (greyscale by default; pass `--color` for washes), and writes WebP + Markdown. The Feed can filter **All / Ink / Color**. Details are in **[docs/plate-pipeline.md](docs/plate-pipeline.md)**.
 
 ```bash
 npm run post -- "Why boxes first" drafting-meta

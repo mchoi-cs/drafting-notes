@@ -6,5 +6,6 @@ excerpt: "Profile study"
 image: "/art/profile-study.webp"
 aspectRatio: "1350 / 1800"
 wide: false
+color: false
 ---
 

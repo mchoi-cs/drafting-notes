@@ -6,5 +6,6 @@ excerpt: "Button eyed Schnauzer"
 image: "/art/button-eyed-schnauzer.webp"
 aspectRatio: "1350 / 1800"
 wide: false
+color: false
 ---
 

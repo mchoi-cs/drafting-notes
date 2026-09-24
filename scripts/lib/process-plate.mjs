@@ -2,18 +2,26 @@
  * Shared plate processing: phone photos of ink-on-paper,
  * flatten uneven lighting, and stretch the paper toward white.
  *
- * Works on RGB so watercolor / ink washes keep their hue. Illumination
- * is estimated from a local-max paper field (ink is darker than paper).
- * Classical correction — no ML needed for these sketches.
+ * Default is greyscale (most plates). Pass `{ color: true }` to keep
+ * watercolor / ink washes. Illumination is estimated from a local-max
+ * paper field. Classical correction — no ML needed.
  */
 import sharp from "sharp";
 
 export const MAX_EDGE = 1800;
 export const QUALITY = 82;
 
-/** Percentiles for final levels stretch (paper → white, ink → black). */
+/** Default levels — paper → white, ink → black. */
 const NORMALIZE_LOWER = 0.5;
 const NORMALIZE_UPPER = 99;
+/** Brighter ink plates: clip paper a bit harder toward white. */
+const BRIGHT_NORMALIZE_UPPER = 93;
+const PAPER_REF = 245;
+const BRIGHT_PAPER_REF = 252;
+
+/**
+ * @typedef {{ color?: boolean, brighter?: boolean }} ProcessOptions
+ */
 
 /**
  * Build a coarse local-max illumination field from a 1-channel buffer,
@@ -70,28 +78,28 @@ function paperField(mono, width, height) {
   return background;
 }
 
-/**
- * Flatten uneven lighting on an RGB buffer. Paper estimate uses the
- * per-pixel max channel (brightest response ≈ paper under ink/wash).
- */
-function flattenIlluminationRgb(rgb, width, height) {
+function flattenIllumination(raw, width, height, channels, paperRef) {
   const pixels = width * height;
   const mono = Buffer.allocUnsafe(pixels);
-  for (let i = 0, p = 0; i < pixels; i++, p += 3) {
-    const r = rgb[p];
-    const g = rgb[p + 1];
-    const b = rgb[p + 2];
-    mono[i] = r > g ? (r > b ? r : b) : g > b ? g : b;
+  if (channels === 1) {
+    raw.copy(mono);
+  } else {
+    for (let i = 0, p = 0; i < pixels; i++, p += channels) {
+      let max = raw[p];
+      for (let c = 1; c < channels; c++) {
+        if (raw[p + c] > max) max = raw[p + c];
+      }
+      mono[i] = max;
+    }
   }
 
   const background = paperField(mono, width, height);
-  const out = Buffer.allocUnsafe(rgb.length);
-  const paperRef = 245;
-  for (let i = 0, p = 0; i < pixels; i++, p += 3) {
+  const out = Buffer.allocUnsafe(raw.length);
+  for (let i = 0, p = 0; i < pixels; i++, p += channels) {
     const bg = background[i] < 16 ? 16 : background[i];
     const scale = paperRef / bg;
-    for (let c = 0; c < 3; c++) {
-      let v = Math.round(rgb[p + c] * scale);
+    for (let c = 0; c < channels; c++) {
+      let v = Math.round(raw[p + c] * scale);
       if (v < 0) v = 0;
       if (v > 255) v = 255;
       out[p + c] = v;
@@ -102,14 +110,19 @@ function flattenIlluminationRgb(rgb, width, height) {
 
 /**
  * @param {string} inputPath already-readable path (HEIC converted if needed)
- * @returns {Promise<{ buffer: Buffer, width: number, height: number }>}
+ * @param {ProcessOptions} [options]
+ * @returns {Promise<{ buffer: Buffer, width: number, height: number, color: boolean }>}
  */
-export async function processPlate(inputPath) {
-  // rotate() applies EXIF orientation first; use the raw `info` size after
-  // resize so portrait phone shots don't get swapped width/height.
-  const { data, info } = await sharp(inputPath)
-    .rotate()
-    .removeAlpha()
+export async function processPlate(inputPath, options = {}) {
+  const color = Boolean(options.color);
+  const brighter = options.brighter !== false && !color;
+  const paperRef = brighter ? BRIGHT_PAPER_REF : PAPER_REF;
+  const normalizeUpper = brighter ? BRIGHT_NORMALIZE_UPPER : NORMALIZE_UPPER;
+
+  let pipeline = sharp(inputPath).rotate().removeAlpha();
+  if (!color) pipeline = pipeline.greyscale();
+
+  const { data, info } = await pipeline
     .resize({
       width: MAX_EDGE,
       height: MAX_EDGE,
@@ -120,23 +133,26 @@ export async function processPlate(inputPath) {
     .toBuffer({ resolveWithObject: true });
 
   const { width, height, channels } = info;
-  if (channels !== 3) {
-    throw new Error(`Expected 3-channel RGB after removeAlpha, got ${channels}`);
-  }
+  const flattened = flattenIllumination(
+    data,
+    width,
+    height,
+    channels,
+    paperRef
+  );
 
-  const flattened = flattenIlluminationRgb(data, width, height);
+  let out = sharp(flattened, {
+    raw: { width, height, channels },
+  }).normalize({ lower: NORMALIZE_LOWER, upper: normalizeUpper });
 
-  const buffer = await sharp(flattened, {
-    raw: { width, height, channels: 3 },
-  })
-    .normalize({ lower: NORMALIZE_LOWER, upper: NORMALIZE_UPPER })
-    .webp({ quality: QUALITY })
-    .toBuffer();
+  if (!color) out = out.toColorspace("b-w");
 
+  const buffer = await out.webp({ quality: QUALITY }).toBuffer();
   const outMeta = await sharp(buffer).metadata();
   return {
     buffer,
     width: outMeta.width ?? width,
     height: outMeta.height ?? height,
+    color,
   };
 }

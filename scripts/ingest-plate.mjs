@@ -1,8 +1,9 @@
 /**
- * Ingest one photo as a plate (keeps ink/watercolor color, whitens paper).
+ * Ingest one photo as a plate.
  *
  *     npm run plate -- ./photo.jpg --caption "Two-point boxes"
- *     npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
+ *     npm run plate -- ./photo.jpg --caption "Cassowary" --color
+ *     npm run plate -- ./photo.jpg --caption "Profile" --section form-construction
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -27,6 +28,10 @@ function arg(name) {
   const index = process.argv.indexOf(`--${name}`);
   if (index === -1) return "";
   return process.argv[index + 1] ?? "";
+}
+
+function hasFlag(name) {
+  return process.argv.includes(`--${name}`);
 }
 
 function slugify(value) {
@@ -63,10 +68,12 @@ const title = arg("title") || caption;
 const sectionArg = arg("section") || "feed";
 const category = CATEGORIES[sectionArg];
 const date = arg("date") || new Date().toISOString().slice(0, 10);
+const color = hasFlag("color");
+const forceSlug = arg("slug");
 
 if (!fileArg || !caption || !category) {
   console.error(
-    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--section feed] [--title "Boxes"] [--date 2026-08-28]'
+    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--color] [--section feed] [--title "Boxes"] [--date 2026-08-28] [--slug existing-slug]'
   );
   process.exit(1);
 }
@@ -77,17 +84,16 @@ if (!existsSync(from)) {
   process.exit(1);
 }
 
-const slug = uniqueSlug(
-  path.join(ROOT, "content", category),
-  slugify(title)
-);
-
-const artDir = path.join(ROOT, "public", "art");
 const contentDir = path.join(ROOT, "content", category);
+const artDir = path.join(ROOT, "public", "art");
 await mkdir(artDir, { recursive: true });
 await mkdir(contentDir, { recursive: true });
 
-const info = await processPlate(await readable(from));
+const slug = forceSlug
+  ? slugify(forceSlug)
+  : uniqueSlug(contentDir, slugify(title));
+
+const info = await processPlate(await readable(from), { color });
 await writeFile(path.join(artDir, `${slug}.webp`), info.buffer);
 
 const wide = info.width / info.height >= 1.3;
@@ -96,12 +102,14 @@ const extras =
   category === "drafting-meta"
     ? `excerpt: "${yaml(caption)}"
 image: "${imagePath}"
+color: ${color}
 `
     : `caption: "${yaml(caption)}"
 excerpt: "${yaml(caption)}"
 image: "${imagePath}"
 aspectRatio: "${info.width} / ${info.height}"
 wide: ${wide}
+color: ${color}
 `;
 
 await writeFile(
@@ -119,3 +127,4 @@ const href =
   category === "feed" ? `/feed/${slug}` : `/${category}/${slug}`;
 console.log(path.relative(ROOT, path.join(contentDir, `${slug}.md`)));
 console.log(`http://localhost:3000${href}`);
+console.log(color ? "color" : "ink (greyscale)");

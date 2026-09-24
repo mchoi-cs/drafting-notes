@@ -6,5 +6,6 @@ excerpt: "Beast and figure"
 image: "/art/beast-and-figure.webp"
 aspectRatio: "1800 / 1350"
 wide: true
+color: false
 ---
 

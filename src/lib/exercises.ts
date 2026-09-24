@@ -24,6 +24,8 @@ export type ExerciseMeta = {
   wide?: boolean;
   medium?: string;
   placeholderColor?: string;
+  /** True when the plate keeps ink/watercolor hue (not greyscale). */
+  color?: boolean;
   readingTime: string;
 };
 
@@ -83,6 +85,7 @@ function toMeta(
     wide: Boolean(data.wide),
     medium: asString(data.medium) || undefined,
     placeholderColor: asString(data.placeholderColor) || undefined,
+    color: Boolean(data.color),
     readingTime: stats.text,
   };
 }

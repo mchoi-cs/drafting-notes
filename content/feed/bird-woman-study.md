@@ -6,5 +6,6 @@ excerpt: "Bird-woman study"
 image: "/art/bird-woman-study.webp"
 aspectRatio: "1350 / 1800"
 wide: false
+color: false
 ---
 

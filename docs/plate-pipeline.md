@@ -5,14 +5,19 @@ Phone photos of ink-on-paper sketches usually look grey and uneven: the page is 
 ## How to run it
 
 ```bash
-# Feed (default) — casual uploads
+# Feed (default) — greyscale ink plates
 npm run plate -- ./photo.jpg --caption "Face study"
+
+# Occasional color wash / watercolor
+npm run plate -- ./photo.jpg --caption "Cassowary" --color
 
 # Form Construction — intentional perspective plates
 npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construction
 ```
 
-Optional flags: `--title`, `--date` (`YYYY-MM-DD`).
+Optional flags: `--title`, `--date` (`YYYY-MM-DD`), `--slug` (overwrite an existing plate), `--color`.
+
+Default processing is **greyscale** (most plates). Pass `--color` to keep hue; that also sets `color: true` in the Markdown so the Feed can filter **All / Ink / Color**.
 
 Batch convert originals in `assets/` (no Markdown):
 
@@ -29,7 +34,7 @@ Both `npm run plate` and `npm run art` call the same processor: [`scripts/lib/pr
 photo (jpg / png / heic…)
         │
         ▼
-  EXIF rotate → greyscale → resize (max edge 1800)
+  EXIF rotate → (greyscale unless --color) → resize (max edge 1800)
         │
         ▼
   Flatten uneven lighting
@@ -37,17 +42,19 @@ photo (jpg / png / heic…)
         │
         ▼
   Percentile normalize (paper → white, ink → black)
+  greyscale uses a slightly brighter clip
         │
         ▼
   WebP (q≈82) → public/art/<slug>.webp
         │
         ▼
   (plate only) Markdown → content/<section>/<slug>.md
+                 including color: true|false
 ```
 
-### 1. Orient and resize
+### 1. Orient, optional greyscale, resize
 
-`sharp` applies EXIF orientation and fits the long edge into 1800px. Color is kept (ink washes, watercolor) — illumination is corrected on RGB, not forced to greyscale.
+`sharp` applies EXIF orientation, optionally converts to greyscale, and fits the long edge into 1800px.
 
 HEIC from iPhones is converted with macOS `sips` first (sharp does not decode HEIC).
 
@@ -58,36 +65,23 @@ Phone shots of a page almost always have a vignette or a soft shadow from the ha
 Instead the pipeline estimates the *paper* as a slowly varying field:
 
 1. Split the image into coarse blocks (~1/40 of the short edge).
-2. In each block, take the **local maximum** of the brightest channel — ink/wash is darker than paper, so that response tracks illumination.
-3. Upsample that field with **bilinear** interpolation from block centers (smooth block edges without bleeding bright center values into dark corners the way a large Gaussian blur would).
-4. Divide each RGB channel by this field and rescale toward a paper reference (~245).
-
-After this step, a shadowed corner and a bright center both read as similar paper white, and blue/grey washes keep their hue.
+2. In each block, take the **local maximum** (brightest channel when color) — ink/wash is darker than paper, so that response tracks illumination.
+3. Upsample that field with **bilinear** interpolation from block centers.
+4. Divide by this field and rescale toward a paper reference (~252 for ink, ~245 for color).
 
 ### 3. Stretch levels
 
-A percentile normalize (`lower ≈ 0.5`, `upper ≈ 99`) maps:
+A percentile normalize maps darkest ink → near black and paper → near white. Ink plates use a slightly lower upper percentile so the page reads a bit brighter on the Feed.
 
-- darkest ink → near black  
-- paper → near white  
+### 4. Encode + write content
 
-Faint pencil sits in the midtones, so it is not crushed to black or wiped out with the paper.
+Output is WebP under `public/art/`. `npm run plate` also writes frontmatter (title, date, caption, image, aspect ratio, `color`) into `content/`.
 
-### 4. Encode + (for `plate`) write content
-
-Output is WebP under `public/art/`. `npm run plate` also writes frontmatter Markdown (title, date, caption, image path, aspect ratio) into `content/feed/` or `content/form-construction/`.
-
-Originals can live in `assets/` (gitignored). Only the processed WebP and Markdown are committed.
+The Feed UI reads `color` and offers **All / Ink / Color** filters when at least one color plate exists.
 
 ## Why not an AI model?
 
-For this specific job — whitening grey paper and evening phone lighting while keeping ink and light pencil — classical illumination correction is enough:
-
-- Deterministic and fast (no GPU, no API key)
-- Does not invent or erase strokes
-- Easy to tune (block size, percentiles, paper reference)
-
-A learned cleanup model could help later for stains, show-through, or aggressive desk clutter. That would be an optional step on top of this pipeline, not a replacement for it.
+For whitening grey paper and evening phone lighting while keeping ink and light pencil, classical illumination correction is enough: deterministic, fast, no API key, and it does not invent strokes. A learned cleanup model could help later for stains or desk clutter as an optional step.
 
 ## Where plates belong
 
@@ -105,3 +99,4 @@ A learned cleanup model could help later for stains, show-through, or aggressive
 | [`scripts/ingest-plate.mjs`](../scripts/ingest-plate.mjs) | `npm run plate` — process + Markdown |
 | [`scripts/prepare-art.mjs`](../scripts/prepare-art.mjs) | `npm run art` — batch `assets/` → `public/art/` |
 | [`scripts/new-post.mjs`](../scripts/new-post.mjs) | `npm run post` — writing-only note |
+| [`src/components/FeedGallery.tsx`](../src/components/FeedGallery.tsx) | Feed All / Ink / Color filter |

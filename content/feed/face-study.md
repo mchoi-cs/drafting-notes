@@ -6,5 +6,6 @@ excerpt: "Face study"
 image: "/art/face-study.webp"
 aspectRatio: "1350 / 1800"
 wide: false
+color: false
 ---
 
