@@ -12,6 +12,7 @@ Live at [charminglines.vercel.app](https://charminglines.vercel.app). Repo: [mch
 | A feed plate | `/feed/[slug]` | That drawing, caption, date |
 | Form Construction | `/form-construction` | Intentional construction plates |
 | Drafting Meta | `/drafting-meta` | Title / date / excerpt list |
+| The feed as JSON | `/feed.json` | The same plates as data, for other sites |
 
 Phone uploads go to the feed. Form construction is only for pieces you mean to file there.
 
@@ -53,6 +54,16 @@ npm run post -- "Why boxes first" drafting-meta
 ```
 
 starts a writing-only note.
+
+## The feed as JSON
+
+[`/feed.json`](https://charminglines.vercel.app/feed.json) is the feed as data: every plate's slug, title, caption, date, aspect ratio, whether it is colour, and the paths to its image and its page. Newest first, so anyone who wants a handful takes them off the front.
+
+[michellechoi-art.vercel.app/charminglines](https://michellechoi-art.vercel.app/charminglines) reads it to show the newest drawings from here. **Something else depends on this file**, so keep the route and keep the field names.
+
+`src/app/feed.json/route.ts` builds it from the same Markdown the Feed page renders, at build time, and Vercel serves it as a static file. That means `npm run plate` is still the whole job: add a plate, push, and the plate is in the feed when the deploy lands. There is no index to update and nothing to run.
+
+Two things it deliberately does not do. It describes nothing outside `content/feed`, so stickers (which are not part of the site at all, and which `.vercelignore` keeps out of the upload) can never appear in it. And `image` and `href` are paths rather than full URLs, so they resolve against whatever host served the file, which keeps preview deployments honest.
 
 ## Deploying
 
