@@ -40,6 +40,14 @@ npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construc
 
 That pipeline fixes orientation, flattens uneven phone lighting, stretches the paper toward white (greyscale by default; pass `--color` for washes), and writes WebP + Markdown. The Feed can filter **All / Ink / Color**. Details are in **[docs/plate-pipeline.md](docs/plate-pipeline.md)**.
 
+Add `--sticker` to also get a white-lines-on-transparent PNG for video overlays:
+
+```bash
+npm run plate -- ./photo.jpg --caption "Shells and starfish" --sticker
+```
+
+It lands in [`stickers/`](stickers/), which is committed but never published.
+
 ```bash
 npm run post -- "Why boxes first" drafting-meta
 ```

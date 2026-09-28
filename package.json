@@ -9,7 +9,8 @@
     "lint": "eslint",
     "art": "node scripts/prepare-art.mjs",
     "post": "node scripts/new-post.mjs",
-    "plate": "node scripts/ingest-plate.mjs"
+    "plate": "node scripts/ingest-plate.mjs",
+    "sticker": "node scripts/make-sticker.mjs"
   },
   "dependencies": {
     "date-fns": "^4.4.0",

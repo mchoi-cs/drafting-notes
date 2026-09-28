@@ -4,16 +4,15 @@
  *     npm run plate -- ./photo.jpg --caption "Two-point boxes"
  *     npm run plate -- ./photo.jpg --caption "Cassowary" --color
  *     npm run plate -- ./photo.jpg --caption "Profile" --section form-construction
+ *     npm run plate -- ./photo.jpg --caption "Shells" --sticker
  */
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { promisify } from "node:util";
-import os from "node:os";
 import path from "node:path";
 import { processPlate } from "./lib/process-plate.mjs";
+import { readable } from "./lib/readable.mjs";
+import { makeSticker, stickerDir, stickerFileName } from "./lib/sticker.mjs";
 
-const run = promisify(execFile);
 const ROOT = path.resolve(import.meta.dirname, "..");
 
 const CATEGORIES = {
@@ -48,13 +47,6 @@ function yaml(value) {
   return value.replace(/"/g, '\\"');
 }
 
-async function readable(file) {
-  if (!/\.heic$/i.test(file)) return file;
-  const staged = path.join(os.tmpdir(), `${path.parse(file).name}.png`);
-  await run("sips", ["-s", "format", "png", file, "--out", staged]);
-  return staged;
-}
-
 function uniqueSlug(dir, base) {
   if (!existsSync(path.join(dir, `${base}.md`))) return base;
   let n = 2;
@@ -70,10 +62,12 @@ const category = CATEGORIES[sectionArg];
 const date = arg("date") || new Date().toISOString().slice(0, 10);
 const color = hasFlag("color");
 const forceSlug = arg("slug");
+const sticker = hasFlag("sticker");
+const stickerBoost = Number(arg("sticker-boost")) || 1;
 
 if (!fileArg || !caption || !category) {
   console.error(
-    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--color] [--section feed] [--title "Boxes"] [--date 2026-08-28] [--slug existing-slug]'
+    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--color] [--section feed] [--title "Boxes"] [--date 2026-08-28] [--slug existing-slug] [--sticker [--sticker-boost 1.4]]'
   );
   process.exit(1);
 }
@@ -93,8 +87,19 @@ const slug = forceSlug
   ? slugify(forceSlug)
   : uniqueSlug(contentDir, slugify(title));
 
-const info = await processPlate(await readable(from), { color });
+const source = await readable(from);
+const info = await processPlate(source, { color });
 await writeFile(path.join(artDir, `${slug}.webp`), info.buffer);
+
+let stickerNote = "";
+if (sticker) {
+  const outDir = stickerDir(ROOT);
+  await mkdir(outDir, { recursive: true });
+  const outFile = path.join(outDir, stickerFileName(slug));
+  const white = await makeSticker(source, { boost: stickerBoost });
+  await writeFile(outFile, white.buffer);
+  stickerNote = `${path.relative(ROOT, outFile)}  ${white.width}x${white.height}  (commit it — that is how it reaches her Mac)`;
+}
 
 const wide = info.width / info.height >= 1.3;
 const imagePath = `/art/${slug}.webp`;
@@ -128,3 +133,4 @@ const href =
 console.log(path.relative(ROOT, path.join(contentDir, `${slug}.md`)));
 console.log(`http://localhost:3000${href}`);
 console.log(color ? "color" : "ink (greyscale)");
+if (stickerNote) console.log(stickerNote);
