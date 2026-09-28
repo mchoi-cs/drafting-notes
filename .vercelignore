@@ -2,5 +2,9 @@
 # copies into public/. The build never opens these files.
 assets
 
+# Video overlays. Committed so they reach Michelle's Mac through GitHub, but
+# they are not part of the site.
+stickers
+
 node_modules
 .next
