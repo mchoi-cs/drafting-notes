@@ -54,35 +54,6 @@ npm run post -- "Why boxes first" drafting-meta
 
 starts a writing-only note.
 
-## The feed as JSON
-
-Everything on the feed is also published at
-**[charminglines.vercel.app/feed.json](https://charminglines.vercel.app/feed.json)** so other
-sites can show the newest plates. [mchoi-cs/myart](https://github.com/mchoi-cs/myart) reads it
-on `/charminglines`.
-
-It is an array, newest first, generated at build time from `content/feed` — one entry per plate:
-
-```json
-[
-  {
-    "slug": "shells-and-starfish",
-    "title": "Shells and starfish",
-    "caption": "Shells and starfish",
-    "date": "2026-09-24",
-    "image": "https://charminglines.vercel.app/art/shells-and-starfish.webp",
-    "aspectRatio": "1350 / 1800",
-    "wide": false,
-    "color": false,
-    "href": "https://charminglines.vercel.app/feed/shells-and-starfish"
-  }
-]
-```
-
-`image` and `href` are absolute so a consumer can use them as-is, and the response sends
-`Access-Control-Allow-Origin: *` so a browser on another origin can fetch it. There is no
-route to update: publish a plate and the next deploy rebuilds the file.
-
 ## Deploying
 
 If the GitHub repo is connected to the Vercel project, push `main` to publish. Until that Git connection is on, deploy with `npx vercel --prod`.

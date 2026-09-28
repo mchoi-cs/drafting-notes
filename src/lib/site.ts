@@ -23,7 +23,6 @@ export type CategorySlug = keyof typeof CATEGORIES;
 
 export const siteConfig = {
   name: "charminglines",
-  url: "https://charminglines.vercel.app",
   description:
     "Exercises in constructing 3D form in perspective — plates and notes.",
   nav: [
