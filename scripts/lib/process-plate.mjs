@@ -67,10 +67,10 @@ function whiteBalanceRgb(rgb, width, height) {
   return out;
 }
 
-function toGreyscale(rgb, width, height) {
+export function toGreyscale(rgb, width, height, channels = 3) {
   const pixels = width * height;
   const out = Buffer.allocUnsafe(pixels);
-  for (let i = 0, p = 0; i < pixels; i++, p += 3) {
+  for (let i = 0, p = 0; i < pixels; i++, p += channels) {
     out[i] = Math.round(
       rgb[p] * 0.299 + rgb[p + 1] * 0.587 + rgb[p + 2] * 0.114
     );
@@ -216,6 +216,17 @@ function softInkPaperWhite(mono) {
 }
 
 /**
+ * Every derivative of a photo starts here, so a plate and its sticker always
+ * sit on the same pixels. Straightening beyond EXIF would belong here too.
+ *
+ * @param {string} inputPath already-readable path (HEIC converted if needed)
+ * @returns {import("sharp").Sharp}
+ */
+export function openOriented(inputPath) {
+  return sharp(inputPath).rotate().removeAlpha();
+}
+
+/**
  * @param {string} inputPath already-readable path (HEIC converted if needed)
  * @param {ProcessOptions} [options]
  * @returns {Promise<{ buffer: Buffer, width: number, height: number, color: boolean }>}
@@ -223,9 +234,7 @@ function softInkPaperWhite(mono) {
 export async function processPlate(inputPath, options = {}) {
   const color = Boolean(options.color);
 
-  const { data: rgb, info } = await sharp(inputPath)
-    .rotate()
-    .removeAlpha()
+  const { data: rgb, info } = await openOriented(inputPath)
     .resize({
       width: MAX_EDGE,
       height: MAX_EDGE,
