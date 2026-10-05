@@ -18,6 +18,14 @@ npm run plate -- ./photo.jpg --caption "Shells and starfish"
 
 Add `--color` for watercolor or ink washes, `--section form-construction` for a deliberate perspective plate. Everything else about that pipeline is in [docs/plate-pipeline.md](docs/plate-pipeline.md). Commit the WebP and the Markdown it writes.
 
+## Check two things before you run it
+
+**Is it a photo of paper, or a digital piece?** That pipeline exists to fix cream paper and phone lighting. A HeavyPaint export or any finished digital work has neither problem, and running it through anyway recolors her painting — the cool greys go pink. Pass `--as-is` for those.
+
+**Is it the right way up?** `sharp` reads EXIF orientation, so phone photos are fine, but app exports often have the rotation baked into the pixels with no tag to read. Pass `--rotate 90`, `180` or `270` (clockwise).
+
+When a file needs `--rotate`, **ask her which way up it goes, or show her the rotated image and wait for a yes.** Do not settle it by working out what the picture depicts. The `airplane` plate went up 180° wrong that way: a propeller got read as an eye, a row of windows as teeth, and the whole thing was confidently published as a beast's head. She knows what she drew; one question costs nothing.
+
 ## Also pass `--sticker` when she asks for one
 
 If she says **sticker**, **overlay**, **creative assets**, **white lines**, or anything about putting the drawing over a video (TikTok, Instagram, Reels), add `--sticker`:
