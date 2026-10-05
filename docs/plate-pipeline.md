@@ -16,9 +16,12 @@ npm run plate -- ./photo.jpg --caption "Two-point boxes" --section form-construc
 
 # Also export a white-line overlay for video
 npm run plate -- ./photo.jpg --caption "Shells and starfish" --sticker
+
+# Finished digital piece, lying on its side with no EXIF tag
+npm run plate -- ./export.jpg --caption "Beast in profile" --as-is --rotate 90
 ```
 
-Optional flags: `--title`, `--date` (`YYYY-MM-DD`), `--slug` (overwrite an existing plate), `--color`, `--sticker`, `--sticker-boost`.
+Optional flags: `--title`, `--date` (`YYYY-MM-DD`), `--slug` (overwrite an existing plate), `--color`, `--sticker`, `--sticker-boost`, `--as-is`, `--rotate`.
 
 Default processing is **greyscale** (most plates). Pass `--color` to keep hue; that also sets `color: true` in the Markdown so the Feed can filter **All / Ink / Color**.
 
@@ -88,6 +91,28 @@ Ink plates use a **soft paper-white grade** (scale the bright paper percentile t
 Output is WebP under `public/art/`. `npm run plate` also writes frontmatter (title, date, caption, image, aspect ratio, `color`) into `content/`.
 
 The Feed UI reads `color` and offers **All / Ink / Color** filters when at least one color plate exists.
+
+## Digital pieces (`--as-is`)
+
+Everything above is a fix for a **photograph of paper**: cream paper, a vignette, a page that is not white. A finished digital piece — a HeavyPaint export, say — has none of those problems, so correcting them anyway just recolors the artist's choices. On the first HeavyPaint piece the paper passes read the cool grey-mauve field as badly lit cream paper and pushed it hot pink, and lifted the dark mass that anchored the composition.
+
+`--as-is` skips white-balance, illumination flattening and levels, leaving orient → resize → WebP:
+
+```bash
+npm run plate -- ./export.jpg --caption "Beast in profile" --as-is
+```
+
+Hue is always kept in this mode, so `--color` is unnecessary. The Markdown's `color:` field is read off the pixels instead of the flag — a neutral piece still files under **Ink**, a colored one under **Color** — so the Feed filter stays truthful without a second flag.
+
+## Rotation (`--rotate`)
+
+`sharp` applies EXIF orientation automatically, which covers phone photos. App exports and screenshots often carry **no** orientation tag at all while the pixels are still sideways, and nothing downstream can guess. `--rotate 90` (or `180` / `270`, degrees clockwise) bakes in the quarter turn:
+
+```bash
+npm run plate -- ./export.jpg --caption "Beast in profile" --rotate 90
+```
+
+It composes with the EXIF turn rather than replacing it, and it is applied in [`openOriented`](../scripts/lib/process-plate.mjs), so a `--sticker` export of the same photo comes out the same way up as its plate.
 
 ## Sticker export (`--sticker`)
 

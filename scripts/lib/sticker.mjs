@@ -41,7 +41,7 @@ const TRIM_ALPHA = 8;
 const TRIM_PADDING = 24;
 
 /**
- * @typedef {{ boost?: number }} StickerOptions
+ * @typedef {{ boost?: number, rotate?: number }} StickerOptions
  * @typedef {{ buffer: Buffer, width: number, height: number,
  *             sourceWidth: number, sourceHeight: number,
  *             specksRemoved: number }} Sticker
@@ -365,7 +365,7 @@ export async function makeSticker(inputPath, options = {}) {
 
   // Same orientation/straightening step the plate gets, but no resize: the
   // sticker is cut from the original pixels.
-  const { data: rgb, info } = await openOriented(inputPath)
+  const { data: rgb, info } = await openOriented(inputPath, options.rotate)
     .raw()
     .toBuffer({ resolveWithObject: true });
 

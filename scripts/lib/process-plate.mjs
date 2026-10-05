@@ -20,7 +20,8 @@ const INK_PAPER_PERCENTILE = 96;
 const INK_PAPER_TARGET = 242;
 
 /**
- * @typedef {{ color?: boolean, brighter?: boolean }} ProcessOptions
+ * @typedef {{ color?: boolean, brighter?: boolean, asIs?: boolean,
+ *             rotate?: number }} ProcessOptions
  */
 
 function channelPercentile(hist, total, p) {
@@ -219,11 +220,33 @@ function softInkPaperWhite(mono) {
  * Every derivative of a photo starts here, so a plate and its sticker always
  * sit on the same pixels. Straightening beyond EXIF would belong here too.
  *
+ * `rotate` is the manual quarter turn for files whose sideways-ness is baked
+ * into the pixels — app exports and screenshots often carry no EXIF tag at
+ * all. It composes with the EXIF turn rather than replacing it.
+ *
  * @param {string} inputPath already-readable path (HEIC converted if needed)
+ * @param {number} [rotate] degrees clockwise, a multiple of 90
  * @returns {import("sharp").Sharp}
  */
-export function openOriented(inputPath) {
-  return sharp(inputPath).rotate().removeAlpha();
+export function openOriented(inputPath, rotate = 0) {
+  const pipeline = sharp(inputPath).rotate().removeAlpha();
+  return rotate ? pipeline.rotate(rotate) : pipeline;
+}
+
+/**
+ * True when every pixel is neutral. Lets an untouched piece report whether it
+ * belongs under the Feed's Ink or Color filter without a second flag.
+ */
+function isMonochrome(rgb) {
+  for (let p = 0; p < rgb.length; p += 3) {
+    const r = rgb[p];
+    const g = rgb[p + 1];
+    const b = rgb[p + 2];
+    const max = r > g ? (r > b ? r : b) : g > b ? g : b;
+    const min = r < g ? (r < b ? r : b) : g < b ? g : b;
+    if (max - min > 6) return false;
+  }
+  return true;
 }
 
 /**
@@ -232,9 +255,9 @@ export function openOriented(inputPath) {
  * @returns {Promise<{ buffer: Buffer, width: number, height: number, color: boolean }>}
  */
 export async function processPlate(inputPath, options = {}) {
-  const color = Boolean(options.color);
+  const asIs = Boolean(options.asIs);
 
-  const { data: rgb, info } = await openOriented(inputPath)
+  const { data: rgb, info } = await openOriented(inputPath, options.rotate)
     .resize({
       width: MAX_EDGE,
       height: MAX_EDGE,
@@ -245,29 +268,38 @@ export async function processPlate(inputPath, options = {}) {
     .toBuffer({ resolveWithObject: true });
 
   const { width, height } = info;
-  const balanced = whiteBalanceRgb(rgb, width, height);
+
+  // Every pass below is a fix for a *photograph of paper*: cream paper, a
+  // vignette, a page that is not white. A finished digital piece has none of
+  // those problems, and correcting them anyway recolors the artist's choices —
+  // so --as-is skips straight to resize and encode, keeping hue.
+  const color = asIs ? !isMonochrome(rgb) : Boolean(options.color);
 
   let raw;
   let channels;
   if (color) {
-    raw = balanced;
+    raw = asIs ? rgb : whiteBalanceRgb(rgb, width, height);
     channels = 3;
   } else {
-    raw = toGreyscale(balanced, width, height);
+    raw = toGreyscale(
+      asIs ? rgb : whiteBalanceRgb(rgb, width, height),
+      width,
+      height
+    );
     channels = 1;
   }
 
-  let leveled = flattenIllumination(raw, width, height, channels, PAPER_REF);
-
-  if (color) {
-    leveled = stretchLevels(
-      leveled,
-      channels,
-      COLOR_NORMALIZE_LOWER,
-      COLOR_NORMALIZE_UPPER
-    );
-  } else {
-    leveled = softInkPaperWhite(leveled);
+  let leveled = raw;
+  if (!asIs) {
+    leveled = flattenIllumination(raw, width, height, channels, PAPER_REF);
+    leveled = color
+      ? stretchLevels(
+          leveled,
+          channels,
+          COLOR_NORMALIZE_LOWER,
+          COLOR_NORMALIZE_UPPER
+        )
+      : softInkPaperWhite(leveled);
   }
 
   let out = sharp(leveled, { raw: { width, height, channels } });

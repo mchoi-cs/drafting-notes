@@ -5,6 +5,7 @@
  *     npm run plate -- ./photo.jpg --caption "Cassowary" --color
  *     npm run plate -- ./photo.jpg --caption "Profile" --section form-construction
  *     npm run plate -- ./photo.jpg --caption "Shells" --sticker
+ *     npm run plate -- ./export.jpg --caption "Beast" --as-is --rotate 90
  */
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -64,10 +65,18 @@ const color = hasFlag("color");
 const forceSlug = arg("slug");
 const sticker = hasFlag("sticker");
 const stickerBoost = Number(arg("sticker-boost")) || 1;
+const asIs = hasFlag("as-is");
+
+/** Quarter turns only — anything else would resample the whole plate. */
+const rotate = (((Number(arg("rotate") || 0) % 360) + 360) % 360) || 0;
+if (!Number.isInteger(rotate) || rotate % 90 !== 0) {
+  console.error("--rotate takes 90, 180 or 270 (degrees clockwise)");
+  process.exit(1);
+}
 
 if (!fileArg || !caption || !category) {
   console.error(
-    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--color] [--section feed] [--title "Boxes"] [--date 2026-08-28] [--slug existing-slug] [--sticker [--sticker-boost 1.4]]'
+    'Usage:\n  npm run plate -- ./photo.jpg --caption "Two-point boxes" [--color] [--section feed] [--title "Boxes"] [--date 2026-08-28] [--slug existing-slug] [--sticker [--sticker-boost 1.4]] [--as-is] [--rotate 90]'
   );
   process.exit(1);
 }
@@ -88,7 +97,7 @@ const slug = forceSlug
   : uniqueSlug(contentDir, slugify(title));
 
 const source = await readable(from);
-const info = await processPlate(source, { color });
+const info = await processPlate(source, { color, asIs, rotate });
 await writeFile(path.join(artDir, `${slug}.webp`), info.buffer);
 
 let stickerNote = "";
@@ -96,7 +105,7 @@ if (sticker) {
   const outDir = stickerDir(ROOT);
   await mkdir(outDir, { recursive: true });
   const outFile = path.join(outDir, stickerFileName(slug));
-  const white = await makeSticker(source, { boost: stickerBoost });
+  const white = await makeSticker(source, { boost: stickerBoost, rotate });
   await writeFile(outFile, white.buffer);
   stickerNote = `${path.relative(ROOT, outFile)}  ${white.width}x${white.height}  (commit it — that is how it reaches her Mac)`;
 }
@@ -107,14 +116,14 @@ const extras =
   category === "drafting-meta"
     ? `excerpt: "${yaml(caption)}"
 image: "${imagePath}"
-color: ${color}
+color: ${info.color}
 `
     : `caption: "${yaml(caption)}"
 excerpt: "${yaml(caption)}"
 image: "${imagePath}"
 aspectRatio: "${info.width} / ${info.height}"
 wide: ${wide}
-color: ${color}
+color: ${info.color}
 `;
 
 await writeFile(
@@ -132,5 +141,9 @@ const href =
   category === "feed" ? `/feed/${slug}` : `/${category}/${slug}`;
 console.log(path.relative(ROOT, path.join(contentDir, `${slug}.md`)));
 console.log(`http://localhost:3000${href}`);
-console.log(color ? "color" : "ink (greyscale)");
+console.log(
+  `${info.color ? "color" : "ink (greyscale)"}` +
+    `${asIs ? ", as-is (no paper correction)" : ""}` +
+    `${rotate ? `, rotated ${rotate}°` : ""}`
+);
 if (stickerNote) console.log(stickerNote);
